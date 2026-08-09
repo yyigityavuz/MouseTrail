@@ -1,0 +1,16 @@
+﻿<Window x:Class="MouseTrail.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Mouse Trail" 
+        Background="Transparent" 
+        AllowsTransparency="True" 
+        WindowStyle="None" 
+        Topmost="True" 
+        WindowState="Maximized"
+        ShowInTaskbar="False" 
+        IsHitTestVisible="False">
+
+    <Canvas x:Name="TrailCanvas" 
+            Background="Transparent" 
+            IsHitTestVisible="False" />
+</Window>
