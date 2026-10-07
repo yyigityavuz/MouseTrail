@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Microsoft.Win32;
 
 namespace MouseTrail
 {
@@ -22,11 +23,17 @@ namespace MouseTrail
 
         private System.Windows.Forms.NotifyIcon trayIcon;
 
+        // Virtual screen (all monitors) in physical pixels
+        private int virtualLeft, virtualTop;
+        private double dpiScaleX = 1, dpiScaleY = 1;
+
         public MainWindow()
         {
             InitializeComponent();
             this.Loaded += OnLoaded;
             CompositionTarget.Rendering += OnRender;
+
+            SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
             SetupTrayIcon();
             InitializeObjectPool(); // Pre-instantiate the lines
@@ -97,14 +104,51 @@ namespace MouseTrail
             IntPtr hwnd = new WindowInteropHelper(this).Handle;
             int extendedStyle = NativeMethods.GetWindowLong(hwnd, NativeMethods.GWL_EXSTYLE);
             NativeMethods.SetWindowLong(hwnd, NativeMethods.GWL_EXSTYLE,
-                extendedStyle | NativeMethods.WS_EX_TRANSPARENT | NativeMethods.WS_EX_LAYERED);
+                extendedStyle | NativeMethods.WS_EX_TRANSPARENT | NativeMethods.WS_EX_LAYERED
+                | NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE);
+
+            CoverVirtualScreen();
+        }
+
+        private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(CoverVirtualScreen));
+        }
+
+        // A DPI change (e.g. window moved between monitors) makes WPF resize the window; re-apply our bounds.
+        protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+        {
+            base.OnDpiChanged(oldDpi, newDpi);
+            CoverVirtualScreen();
+        }
+
+        // Stretches the single overlay window across every monitor (positions are in physical pixels).
+        private void CoverVirtualScreen()
+        {
+            IntPtr hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+
+            virtualLeft = NativeMethods.GetSystemMetrics(NativeMethods.SM_XVIRTUALSCREEN);
+            virtualTop = NativeMethods.GetSystemMetrics(NativeMethods.SM_YVIRTUALSCREEN);
+            int width = NativeMethods.GetSystemMetrics(NativeMethods.SM_CXVIRTUALSCREEN);
+            int height = NativeMethods.GetSystemMetrics(NativeMethods.SM_CYVIRTUALSCREEN);
+
+            NativeMethods.SetWindowPos(hwnd, NativeMethods.HWND_TOPMOST, virtualLeft, virtualTop, width, height,
+                NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
+
+            DpiScale dpi = VisualTreeHelper.GetDpi(this);
+            dpiScaleX = dpi.DpiScaleX;
+            dpiScaleY = dpi.DpiScaleY;
         }
 
         private void OnRender(object sender, EventArgs e)
         {
             if (NativeMethods.GetCursorPos(out NativeMethods.POINT mousePos))
             {
-                System.Windows.Point wpfPos = PointFromScreen(new System.Windows.Point(mousePos.X, mousePos.Y));
+                // Physical screen pixels -> window DIPs (PointFromScreen is unreliable across mixed-DPI monitors)
+                var wpfPos = new System.Windows.Point(
+                    (mousePos.X - virtualLeft) / dpiScaleX,
+                    (mousePos.Y - virtualTop) / dpiScaleY);
 
                 if (!lastMousePos.HasValue) { lastMousePos = wpfPos; return; }
 
@@ -149,6 +193,7 @@ namespace MouseTrail
                 trayIcon.Dispose();
             }
             CompositionTarget.Rendering -= OnRender;
+            SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             base.OnClosed(e);
         }
     }
