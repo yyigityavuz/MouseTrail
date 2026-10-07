@@ -10,6 +10,7 @@ namespace MouseTrail
         public string Color { get; set; } = "#9370DB"; // MediumPurple
         public double Thickness { get; set; } = 12;
         public int Length { get; set; } = 40;
+        public bool ChangeColorOnClick { get; set; } = true; // change trail color while a mouse button is held
 
         private static readonly string FilePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MouseTrail", "settings.json");
