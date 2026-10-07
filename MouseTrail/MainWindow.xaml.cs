@@ -31,6 +31,7 @@ namespace MouseTrail
         private bool anyVisible; // lets the fade loop sleep while the mouse is idle
 
         private System.Windows.Forms.NotifyIcon trayIcon;
+        private bool colorPickerOpen;
 
         // Virtual screen (all monitors) in physical pixels
         private int virtualLeft, virtualTop;
@@ -70,7 +71,7 @@ namespace MouseTrail
         private void SetupTrayIcon()
         {
             trayIcon = new System.Windows.Forms.NotifyIcon();
-            trayIcon.Icon = System.Drawing.SystemIcons.Application;
+            trayIcon.Icon = TrayIconFactory.Create(ToDrawingColor(trailColor.Color));
             trayIcon.Visible = true;
             trayIcon.Text = "Mouse Trail";
 
@@ -112,22 +113,61 @@ namespace MouseTrail
             settings.Save();
         }
 
+        private static System.Drawing.Color ToDrawingColor(System.Windows.Media.Color c) =>
+            System.Drawing.Color.FromArgb(c.A, c.R, c.G, c.B);
+
+        // The dialog runs on its own STA thread so the overlay keeps rendering while it is open
         private void PickColor()
         {
-            var colorDialog = new System.Windows.Forms.ColorDialog();
-            if (colorDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-                var wpfColor = System.Windows.Media.Color.FromArgb(
-                    colorDialog.Color.A,
-                    colorDialog.Color.R,
-                    colorDialog.Color.G,
-                    colorDialog.Color.B);
+            if (colorPickerOpen) return;
+            colorPickerOpen = true;
 
-                trailColor = new SolidColorBrush(wpfColor);
-                trailColor.Freeze();
-                settings.Color = wpfColor.ToString();
-                settings.Save();
-            }
+            var initial = ToDrawingColor(trailColor.Color);
+            var thread = new System.Threading.Thread(() =>
+            {
+                System.Drawing.Color? picked = null;
+                try
+                {
+                    // Invisible topmost owner keeps the dialog above the topmost overlay window
+                    using var owner = new System.Windows.Forms.Form
+                    {
+                        TopMost = true,
+                        ShowInTaskbar = false,
+                        FormBorderStyle = System.Windows.Forms.FormBorderStyle.None,
+                        StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen,
+                        Size = new System.Drawing.Size(1, 1),
+                        Opacity = 0
+                    };
+                    owner.Show();
+                    using var dialog = new System.Windows.Forms.ColorDialog { Color = initial, FullOpen = true };
+                    if (dialog.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK)
+                        picked = dialog.Color;
+                }
+                finally
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        colorPickerOpen = false;
+                        if (picked.HasValue) ApplyColor(picked.Value);
+                    }));
+                }
+            });
+            thread.SetApartmentState(System.Threading.ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
+        }
+
+        private void ApplyColor(System.Drawing.Color color)
+        {
+            var wpfColor = System.Windows.Media.Color.FromArgb(color.A, color.R, color.G, color.B);
+            trailColor = new SolidColorBrush(wpfColor);
+            trailColor.Freeze();
+            settings.Color = wpfColor.ToString();
+            settings.Save();
+
+            var oldIcon = trayIcon.Icon;
+            trayIcon.Icon = TrayIconFactory.Create(color);
+            oldIcon?.Dispose();
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -235,6 +275,7 @@ namespace MouseTrail
             if (trayIcon != null)
             {
                 trayIcon.Visible = false;
+                trayIcon.Icon?.Dispose();
                 trayIcon.Dispose();
             }
             CompositionTarget.Rendering -= OnRender;
