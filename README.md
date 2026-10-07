@@ -13,7 +13,14 @@ A lightweight Windows desktop app that draws a customizable, fading trail behind
 - **Single instance:** Launching it twice won't give you two trails.
 
 ## Download
-Grab the latest `MouseTrail-*-win-x64.zip` from the [Releases](../../releases) page, extract it, and run `MouseTrail.exe`. It is self-contained, so you don't need to install .NET.
+Grab the latest build from the [Releases](../../releases) page, extract the zip, and run `MouseTrail.exe`. Two variants are published:
+
+| File | Size | Needs .NET installed? |
+| --- | --- | --- |
+| `MouseTrail-<version>-win-x64.zip` | ~70 MB | No (self-contained) |
+| `MouseTrail-<version>-win-x64-framework-dependent.zip` | ~1 MB | Yes, the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (x64) |
+
+If you are unsure which one to pick, use the self-contained build.
 
 > The executable is not code-signed, so Windows SmartScreen may warn you the first time. Choose **More info → Run anyway**, or build it yourself from source (see below).
 
@@ -38,7 +45,7 @@ cd MouseTrail
 dotnet run --project MouseTrail/MouseTrail.csproj
 ```
 
-Create a self-contained single-file build:
+Create a self-contained single-file build (add `--self-contained false` and drop the last flag for the small framework-dependent one):
 
 ```powershell
 dotnet publish MouseTrail/MouseTrail.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
