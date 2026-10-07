@@ -11,7 +11,7 @@ namespace MouseTrail
     public partial class MainWindow : Window
     {
         // Object Pool pattern to avoid continuous instantiation and garbage collection overhead
-        private Line[] linePool;
+        private Line[] linePool = null!; // created in InitializeObjectPool
         private int poolIndex = 0;
         private const int MAX_LINES = 100; // Maximum allowed trail capacity
 
@@ -30,7 +30,7 @@ namespace MouseTrail
         private double lastFrameSeconds;
         private bool anyVisible; // lets the fade loop sleep while the mouse is idle
 
-        private System.Windows.Forms.NotifyIcon trayIcon;
+        private System.Windows.Forms.NotifyIcon trayIcon = null!; // created in SetupTrayIcon
         private bool colorPickerOpen;
 
         // Virtual screen (all monitors) in physical pixels
