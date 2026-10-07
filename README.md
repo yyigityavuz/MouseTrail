@@ -52,7 +52,7 @@ dotnet publish MouseTrail/MouseTrail.csproj -c Release -r win-x64 --self-contain
 ```
 
 ## Releasing
-Pushing a tag such as `v1.0.0` runs the GitHub Actions workflow, which builds, publishes and attaches `MouseTrail-v1.0.0-win-x64.zip` to a new GitHub release.
+Pushing a tag such as `v1.0.0` runs the GitHub Actions workflow, which builds, publishes and attaches the zips to a new GitHub release. The executable's version is taken from the tag (`v1.0.0` becomes `1.0.0`), so there is no need to edit `<Version>` in the project file; it is only the fallback for local builds.
 
 ## Technologies
 - C# / .NET 10
