@@ -6,7 +6,9 @@
         AllowsTransparency="True" 
         WindowStyle="None" 
         Topmost="True" 
-        WindowState="Maximized"
+        WindowState="Normal"
+        ResizeMode="NoResize"
+        Left="0" Top="0" Width="1" Height="1"
         ShowInTaskbar="False" 
         IsHitTestVisible="False">
 

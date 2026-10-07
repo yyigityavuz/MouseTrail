@@ -6,5 +6,10 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
+		<Version>1.0.0</Version>
+		<Authors>yyigityavuz</Authors>
+		<Product>Mouse Trail</Product>
+		<Copyright>Copyright (c) 2026 yyigityavuz</Copyright>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
 	</PropertyGroup>
 </Project>
