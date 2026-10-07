@@ -20,6 +20,10 @@ namespace MouseTrail
         // --- CONFIGURATION VARIABLES ---
         private readonly TrailSettings settings = TrailSettings.Load();
         private SolidColorBrush trailColor;
+        private SolidColorBrush leftClickColor = null!;   // created in UpdateClickBrushes
+        private SolidColorBrush rightClickColor = null!;
+        private SolidColorBrush middleClickColor = null!;
+        private bool clickColorsEnabled;
         private double trailThickness;
         private int trailLength;
 
@@ -42,6 +46,8 @@ namespace MouseTrail
             InitializeComponent();
             trailColor = new SolidColorBrush(settings.ToColor());
             trailColor.Freeze();
+            UpdateClickBrushes();
+            clickColorsEnabled = settings.ChangeColorOnClick;
             trailThickness = settings.Thickness;
             trailLength = Math.Clamp(settings.Length, 1, MAX_LINES);
             this.Loaded += OnLoaded;
@@ -94,6 +100,19 @@ namespace MouseTrail
 
             menu.Items.Add("-");
 
+            var clickColorItem = new System.Windows.Forms.ToolStripMenuItem("Change color while clicking")
+            {
+                Checked = clickColorsEnabled,
+                CheckOnClick = true
+            };
+            clickColorItem.CheckedChanged += (s, e) =>
+            {
+                clickColorsEnabled = clickColorItem.Checked;
+                settings.ChangeColorOnClick = clickColorsEnabled;
+                settings.Save();
+            };
+            menu.Items.Add(clickColorItem);
+
             var startupItem = new System.Windows.Forms.ToolStripMenuItem("Start with Windows")
             {
                 Checked = StartupManager.IsEnabled(),
@@ -125,6 +144,23 @@ namespace MouseTrail
             if (poolIndex >= trailLength) poolIndex = 0;
             settings.Length = trailLength;
             settings.Save();
+        }
+
+        private void UpdateClickBrushes()
+        {
+            leftClickColor = ClickColors.ForLeft(trailColor.Color);
+            rightClickColor = ClickColors.ForRight(trailColor.Color);
+            middleClickColor = ClickColors.ForMiddle(trailColor.Color);
+        }
+
+        // Left = inverse color, right = hue +120, middle = hue +240; left wins if several buttons are held
+        private SolidColorBrush CurrentBrush()
+        {
+            if (!clickColorsEnabled) return trailColor;
+            if ((NativeMethods.GetAsyncKeyState(NativeMethods.VK_LBUTTON) & 0x8000) != 0) return leftClickColor;
+            if ((NativeMethods.GetAsyncKeyState(NativeMethods.VK_RBUTTON) & 0x8000) != 0) return rightClickColor;
+            if ((NativeMethods.GetAsyncKeyState(NativeMethods.VK_MBUTTON) & 0x8000) != 0) return middleClickColor;
+            return trailColor;
         }
 
         private static System.Drawing.Color ToDrawingColor(System.Windows.Media.Color c) =>
@@ -176,6 +212,7 @@ namespace MouseTrail
             var wpfColor = System.Windows.Media.Color.FromArgb(color.A, color.R, color.G, color.B);
             trailColor = new SolidColorBrush(wpfColor);
             trailColor.Freeze();
+            UpdateClickBrushes();
             settings.Color = wpfColor.ToString();
             settings.Save();
 
@@ -254,7 +291,7 @@ namespace MouseTrail
                     segment.X2 = wpfPos.X;
                     segment.Y2 = wpfPos.Y;
 
-                    segment.Stroke = trailColor;
+                    segment.Stroke = CurrentBrush();
                     segment.StrokeThickness = trailThickness;
                     segment.Opacity = START_OPACITY;
                     anyVisible = true;

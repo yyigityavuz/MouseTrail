@@ -21,6 +21,13 @@ namespace MouseTrail
         public const uint SWP_NOACTIVATE = 0x0010;
         public const uint SWP_SHOWWINDOW = 0x0040;
 
+        public const int VK_LBUTTON = 0x01;
+        public const int VK_RBUTTON = 0x02;
+        public const int VK_MBUTTON = 0x04;
+
+        [DllImport("user32.dll")]
+        public static extern short GetAsyncKeyState(int vKey);
+
         [DllImport("user32.dll")]
         public static extern int GetSystemMetrics(int nIndex);
 
