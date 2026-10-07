@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Windows.Media;
 
@@ -37,7 +37,7 @@ namespace MouseTrail
 
         public System.Windows.Media.Color ToColor()
         {
-            try { return (System.Windows.Media.Color)ColorConverter.ConvertFromString(Color); }
+            try { return (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(Color); }
             catch { return Colors.MediumPurple; }
         }
     }

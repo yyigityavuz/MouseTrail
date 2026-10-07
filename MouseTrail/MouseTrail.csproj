@@ -10,6 +10,8 @@
 		<Authors>yyigityavuz</Authors>
 		<Product>Mouse Trail</Product>
 		<Copyright>Copyright (c) 2026 yyigityavuz</Copyright>
+		<!-- DPI awareness comes from app.manifest (PerMonitorV2); WPF handles it, the WinForms analyzer warning does not apply -->
+		<NoWarn>$(NoWarn);WFO0003</NoWarn>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 	</PropertyGroup>
 </Project>
