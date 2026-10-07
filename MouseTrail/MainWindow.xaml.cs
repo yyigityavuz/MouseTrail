@@ -93,6 +93,20 @@ namespace MouseTrail
             menu.Items.Add(lengthMenu);
 
             menu.Items.Add("-");
+
+            var startupItem = new System.Windows.Forms.ToolStripMenuItem("Start with Windows")
+            {
+                Checked = StartupManager.IsEnabled(),
+                CheckOnClick = true
+            };
+            startupItem.CheckedChanged += (s, e) =>
+            {
+                try { StartupManager.SetEnabled(startupItem.Checked); }
+                catch { startupItem.Checked = StartupManager.IsEnabled(); }
+            };
+            menu.Items.Add(startupItem);
+
+            menu.Items.Add("-");
             menu.Items.Add("Exit", null, (s, e) => System.Windows.Application.Current.Shutdown());
 
             trayIcon.ContextMenuStrip = menu;
