@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -17,9 +18,17 @@ namespace MouseTrail
         private System.Windows.Point? lastMousePos = null;
 
         // --- CONFIGURATION VARIABLES ---
-        private SolidColorBrush trailColor = System.Windows.Media.Brushes.MediumPurple;
-        private double trailThickness = 12;
-        private int trailLength = 40;
+        private readonly TrailSettings settings = TrailSettings.Load();
+        private SolidColorBrush trailColor;
+        private double trailThickness;
+        private int trailLength;
+
+        private const double START_OPACITY = 0.9;
+        // Seconds of fade time per unit of trail length (length 40 -> ~0.4s)
+        private const double FADE_SECONDS_PER_LENGTH = 0.01;
+        private readonly Stopwatch frameClock = Stopwatch.StartNew();
+        private double lastFrameSeconds;
+        private bool anyVisible; // lets the fade loop sleep while the mouse is idle
 
         private System.Windows.Forms.NotifyIcon trayIcon;
 
@@ -30,6 +39,10 @@ namespace MouseTrail
         public MainWindow()
         {
             InitializeComponent();
+            trailColor = new SolidColorBrush(settings.ToColor());
+            trailColor.Freeze();
+            trailThickness = settings.Thickness;
+            trailLength = Math.Clamp(settings.Length, 1, MAX_LINES);
             this.Loaded += OnLoaded;
             CompositionTarget.Rendering += OnRender;
 
@@ -66,22 +79,37 @@ namespace MouseTrail
             menu.Items.Add("Select Color", null, (s, e) => PickColor());
 
             var thicknessMenu = new System.Windows.Forms.ToolStripMenuItem("Set Thickness");
-            thicknessMenu.DropDownItems.Add("Very Thin (6)", null, (s, e) => trailThickness = 6);
-            thicknessMenu.DropDownItems.Add("Normal (12)", null, (s, e) => trailThickness = 12);
-            thicknessMenu.DropDownItems.Add("Thick (24)", null, (s, e) => trailThickness = 24);
-            thicknessMenu.DropDownItems.Add("Very Thick (40)", null, (s, e) => trailThickness = 40);
+            thicknessMenu.DropDownItems.Add("Very Thin (6)", null, (s, e) => SetThickness(6));
+            thicknessMenu.DropDownItems.Add("Normal (12)", null, (s, e) => SetThickness(12));
+            thicknessMenu.DropDownItems.Add("Thick (24)", null, (s, e) => SetThickness(24));
+            thicknessMenu.DropDownItems.Add("Very Thick (40)", null, (s, e) => SetThickness(40));
             menu.Items.Add(thicknessMenu);
 
             var lengthMenu = new System.Windows.Forms.ToolStripMenuItem("Set Length");
-            lengthMenu.DropDownItems.Add("Short (20)", null, (s, e) => trailLength = 20);
-            lengthMenu.DropDownItems.Add("Normal (40)", null, (s, e) => trailLength = 40);
-            lengthMenu.DropDownItems.Add("Long (80)", null, (s, e) => trailLength = 80);
+            lengthMenu.DropDownItems.Add("Short (20)", null, (s, e) => SetLength(20));
+            lengthMenu.DropDownItems.Add("Normal (40)", null, (s, e) => SetLength(40));
+            lengthMenu.DropDownItems.Add("Long (80)", null, (s, e) => SetLength(80));
             menu.Items.Add(lengthMenu);
 
             menu.Items.Add("-");
             menu.Items.Add("Exit", null, (s, e) => System.Windows.Application.Current.Shutdown());
 
             trayIcon.ContextMenuStrip = menu;
+        }
+
+        private void SetThickness(double value)
+        {
+            trailThickness = value;
+            settings.Thickness = value;
+            settings.Save();
+        }
+
+        private void SetLength(int value)
+        {
+            trailLength = Math.Clamp(value, 1, MAX_LINES);
+            if (poolIndex >= trailLength) poolIndex = 0;
+            settings.Length = trailLength;
+            settings.Save();
         }
 
         private void PickColor()
@@ -96,6 +124,9 @@ namespace MouseTrail
                     colorDialog.Color.B);
 
                 trailColor = new SolidColorBrush(wpfColor);
+                trailColor.Freeze();
+                settings.Color = wpfColor.ToString();
+                settings.Save();
             }
         }
 
@@ -141,8 +172,12 @@ namespace MouseTrail
             dpiScaleY = dpi.DpiScaleY;
         }
 
-        private void OnRender(object sender, EventArgs e)
+        private void OnRender(object? sender, EventArgs e)
         {
+            double now = frameClock.Elapsed.TotalSeconds;
+            double dt = now - lastFrameSeconds;
+            lastFrameSeconds = now;
+
             if (NativeMethods.GetCursorPos(out NativeMethods.POINT mousePos))
             {
                 // Physical screen pixels -> window DIPs (PointFromScreen is unreliable across mixed-DPI monitors)
@@ -167,7 +202,8 @@ namespace MouseTrail
 
                     segment.Stroke = trailColor;
                     segment.StrokeThickness = trailThickness;
-                    segment.Opacity = 0.9;
+                    segment.Opacity = START_OPACITY;
+                    anyVisible = true;
 
                     poolIndex++;
                     if (poolIndex >= trailLength) poolIndex = 0;
@@ -176,13 +212,22 @@ namespace MouseTrail
                 }
             }
 
+            if (!anyVisible) return;
+
+            // Time-based fade: independent of refresh rate; a longer trail lives longer
+            double fade = dt * START_OPACITY / (trailLength * FADE_SECONDS_PER_LENGTH);
+            bool stillVisible = false;
             for (int i = 0; i < MAX_LINES; i++)
             {
-                if (linePool[i].Opacity > 0)
+                double opacity = linePool[i].Opacity;
+                if (opacity > 0)
                 {
-                    linePool[i].Opacity -= 0.04;
+                    opacity = Math.Max(0, opacity - fade);
+                    linePool[i].Opacity = opacity;
+                    if (opacity > 0) stillVisible = true;
                 }
             }
+            anyVisible = stillVisible;
         }
 
         protected override void OnClosed(EventArgs e)
